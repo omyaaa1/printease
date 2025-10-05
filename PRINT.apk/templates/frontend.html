@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Printease</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    body {
+      background: linear-gradient(120deg, #f5f6fa 0%, #e9ecef 100%);
+      color: #222;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    header {
+      background: #232326;
+      color: #fff;
+      text-align: center;
+      padding: 2rem 0 1rem 0;
+      font-size: 2.2rem;
+      letter-spacing: 1px;
+      font-weight: bold;
+      border-bottom: 2px solid #3a8dde;
+      box-shadow: 0 2px 8px rgba(44, 62, 80, 0.08);
+    }
+    .nav-bar {
+      display: flex;
+      justify-content: center;
+      gap: 1.2rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .nav-btn {
+      background: #3a8dde;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 1.3rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s;
+      text-decoration: none;
+      display: inline-block;
+      box-shadow: 0 2px 8px #3a8dde44;
+    }
+    .nav-btn:active {
+      transform: scale(0.98);
+      box-shadow: 0 1px 4px #3a8dde33;
+    }
+    .nav-btn:hover {
+      background: #145489;
+      color: #fff;
+      box-shadow: 0 12px 32px #3a8dde55;
+      transform: translateY(-2px) scale(1.04);
+    }
+    .container {
+      max-width: 480px;
+      margin: 2rem auto;
+      background: #fff;
+      color: #222;
+      padding: 2rem 1.2rem;
+      border-radius: 18px;
+      box-shadow: 0 4px 16px rgba(44, 62, 80, 0.07);
+      border: 2px solid #e9ecef;
+    }
+    h2 {
+      color: #232326;
+      font-size: 1.6rem;
+      margin-bottom: 1.2rem;
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 8px #e9ecef;
+    }
+    label {
+      display: block;
+      margin-top: 1.2rem;
+      font-weight: 600;
+      font-size: 1.08rem;
+      color: #3a8dde;
+      letter-spacing: 0.5px;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 7px;
+      border: 1px solid #dfe6e9;
+      border-radius: 10px;
+      font-size: 1.08rem;
+      background: #f5f6fa;
+      color: #232326;
+      box-sizing: border-box;
+      outline: none;
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s, border 0.2s;
+      box-shadow: 0 2px 8px #e9ecef44;
+      font-weight: 400;
+    }
+    input:focus, select:focus, button:focus {
+      box-shadow: 0 4px 16px #3a8dde88;
+      border: 2px solid #3a8dde;
+      background: #fff;
+    }
+    input[type="file"] {
+      background: #fff;
+      color: #232326;
+      border: 1px solid #3a8dde;
+      padding: 10px;
+      box-shadow: 0 2px 8px #3a8dde44;
+    }
+    button {
+      background: #3a8dde;
+      color: #fff;
+      border-radius: 10px;
+      margin-top: 1.5rem;
+      font-size: 1.15rem;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px #3a8dde44;
+      cursor: pointer;
+      border: none;
+      transition: box-shadow 0.2s, transform 0.2s, background 0.2s;
+    }
+    button:hover {
+      background: #145489;
+      color: #fff;
+      box-shadow: 0 12px 32px #3a8dde55;
+      transform: translateY(-2px) scale(1.04);
+    }
+    .price-display {
+      margin-top: 1.2rem;
+      background: #e9ecef;
+      padding: 12px;
+      border-radius: 10px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 1.15rem;
+      color: #145489;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px #3a8dde44;
+      border: 1.5px solid #3a8dde;
+      margin-bottom: 1rem;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      overflow: auto;
+      background: rgba(44,62,80,0.85);
+      backdrop-filter: blur(2px);
+    }
+    .modal-content {
+      background: #fff;
+      margin: 8% auto;
+      padding: 2rem;
+      border-radius: 18px;
+      max-width: 400px;
+      color: #232326;
+      box-shadow: 0 8px 32px rgba(44,62,80,0.15);
+      position: relative;
+      border: 2px solid #3a8dde;
+      transform: perspective(700px) rotateY(-2deg);
+    }
+    .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 18px;
+      color: #3a8dde;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+      background: none;
+      border: none;
+      text-shadow: 0 2px 8px #3a8dde44;
+    }
+    .modal-content h2 {
+      color: #145489;
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+    }
+    .modal-content ul {
+      color: #232326;
+      font-size: 1rem;
+      margin: 0;
+      padding-left: 1.2rem;
+    }
+    .modal-content li b {
+      color: #3a8dde;
+    }
+    @media (max-width: 600px) {
+      .container {
+        max-width: 98vw;
+        padding: 1.2rem 0.5rem;
+        border-radius: 12px;
+      }
+      header {
+        font-size: 1.3rem;
+        padding: 1.2rem 0 0.7rem 0;
+      }
+      h2 {
+        font-size: 1.1rem;
+      }
+      input, select, button {
+        font-size: 1rem;
+        padding: 10px;
+        border-radius: 10px;
+      }
+      .price-display {
+        font-size: 1rem;
+        padding: 10px;
+        border-radius: 10px;
+      }
+      .nav-btn {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+      }
+      .modal-content {
+        max-width: 95vw;
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    PRINT.APK
+    <div class="nav-bar">
+      <a href="/" class="nav-btn">Home</a>
+      <a href="/track" class="nav-btn">Track Your Order</a>
+      <a href="/contact" class="nav-btn">Contact Us</a>
+      <button type="button" class="nav-btn" onclick="showHelp()">Help</button>
+    </div>
+  </header>
+  <div class="container">
+    <h2>Upload Your Files</h2>
+    <form id="printForm" action="/upload" method="post" enctype="multipart/form-data">
+      <label for="fileUpload">Select Files:</label>
+      <input type="file" id="fileUpload" name="file" multiple required />
+
+      <div id="fileList"></div>
+
+      <label for="print_type">Print Type:</label>
+      <select id="print_type" name="print_type">
+        <option value="bw">Black & White</option>
+        <option value="color">Color</option>
+      </select>
+
+      <label for="sideOption">Sides:</label>
+      <select id="sideOption" name="side">
+        <option value="single">Single Side</option>
+        <option value="double">Double Side</option>
+      </select>
+
+      <label for="lamination">Lamination:</label>
+      <select id="lamination" name="lamination">
+        <option value="no">No</option>
+        <option value="yes">Yes (+₹25)</option>
+      </select>
+
+      <label for="hostel">Hostel Resident?</label>
+      <select id="hostel" name="hostel" onchange="toggleDelivery()">
+        <option value="no">No</option>
+        <option value="yes">Yes</option>
+      </select>
+
+      <div id="deliveryDiv" style="display:none;">
+        <label for="delivery">Deliver to Room?</label>
+        <select id="delivery" name="delivery">
+          <option value="no">No</option>
+          <option value="yes">Yes (+₹10)</option>
+        </select>
+      </div>
+
+      <button type="button" onclick="calculatePrice()">Calculate Price</button>
+      <div class="price-display" id="priceDisplay">Total: ₹0</div>
+      <button type="submit">Submit Order</button>
+    </form>
+  </div>
+  <!-- Help Modal -->
+  <div id="helpModal" class="modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeHelp()">&times;</button>
+      <h2 style="text-align:center;">Help</h2>
+      <ul>
+        <li><b>Home:</b> Go to the main upload page.</li>
+        <li><b>Track Your Order:</b> Check the status of your submitted print orders.</li>
+        <li><b>Contact Us:</b> Get in touch for support or queries.</li>
+        <li><b>Help:</b> View instructions for using the website.</li>
+        <li><b>Select File:</b> Choose any file type to print (images, documents, txt, etc).</li>
+        <li><b>Print Type:</b> Select Black & White or Color printing.</li>
+        <li><b>Sides:</b> Choose single or double-sided printing.</li>
+        <li><b>Lamination:</b> Add lamination for extra protection (+₹25).</li>
+        <li><b>Hostel Resident:</b> Specify if you live in the hostel for delivery options.</li>
+        <li><b>Deliver to Room:</b> If hostel resident, opt for room delivery (+₹10).</li>
+        <li><b>Number of Copies:</b> Enter how many copies you want.</li>
+        <li><b>Calculate Price:</b> See the estimated total before submitting.</li>
+        <li><b>Submit Order:</b> Send your print request.</li>
+      </ul>
+    </div>
+  </div>
+  <script>
+    function toggleDelivery() {
+      var hostel = document.getElementById('hostel').value;
+      document.getElementById('deliveryDiv').style.display = hostel === 'yes' ? 'block' : 'none';
+    }
+    function calculatePrice() {
+      const type = document.getElementById('print_type').value;
+      const side = document.getElementById('sideOption').value;
+      const lamination = document.getElementById('lamination').value;
+      const copies = parseInt(document.getElementById('copies').value);
+      const hostel = document.getElementById('hostel').value;
+      const delivery = hostel === 'yes' ? document.getElementById('delivery').value : 'no';
+
+      let rate = 0;
+      if (type === 'bw') {
+        rate = side === 'single' ? 3 : 5;
+      } else if (type === 'color') {
+        rate = 20;
+      }
+
+      let total = rate * copies;
+      if (lamination === 'yes') {
+        total += 25;
+      }
+      if (hostel === 'yes' && delivery === 'yes') {
+        total += 10;
+      }
+
+      document.getElementById('priceDisplay').textContent = `Total: ₹${total}`;
+    }
+
+    // Show selected files and their page counts (for PDFs)
+    document.getElementById('fileUpload').addEventListener('change', function(event) {
+      const fileListDiv = document.getElementById('fileList');
+      fileListDiv.innerHTML = '';
+      const files = event.target.files;
+
+      Array.from(files).forEach(file => {
+        const fileItem = document.createElement('div');
+        fileItem.textContent = `File: ${file.name}`;
+
+        // If PDF, try to read page count using PDF.js or show "PDF file"
+        if (file.name.toLowerCase().endsWith('.pdf')) {
+          // We cannot read PDF pages count directly in frontend without PDF.js or similar library
+          // So just indicate it's a PDF file here
+          fileItem.textContent += ' (PDF file)';
+        }
+
+        fileListDiv.appendChild(fileItem);
+      });
+    });
+
+    function showHelp() {
+      document.getElementById('helpModal').style.display = 'block';
+    }
+    function closeHelp() {
+      document.getElementById('helpModal').style.display = 'none';
+    }
+    window.onclick = function(event) {
+      var modal = document.getElementById('helpModal');
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+  </script>
+</body>
+</html>
