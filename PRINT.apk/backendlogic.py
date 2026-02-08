@@ -1,19 +1,28 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, Response, send_from_directory
 import os
 import sqlite3
 from datetime import datetime
 from PyPDF2 import PdfReader
+from werkzeug.utils import secure_filename
 import re
 import random
-import csv
+import uuid
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = 'uploads'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_UPLOAD = os.path.join(BASE_DIR, 'uploads')
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', DEFAULT_UPLOAD)
+if os.environ.get('VERCEL'):
+    UPLOAD_FOLDER = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'printease_uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-DB_NAME = 'orders.db'
+DB_NAME = os.path.join(BASE_DIR, 'orders.db')
+if os.environ.get('VERCEL'):
+    DB_NAME = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'orders.db')
+
+
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -32,19 +41,56 @@ def init_db():
                     phone TEXT,
                     email TEXT,
                     room_no TEXT,
-                    created_at TEXT
+                    created_at TEXT,
+                    tracking_code TEXT,
+                    status TEXT
                 )''')
     conn.commit()
     conn.close()
 
+
+def ensure_columns():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(orders)")
+    existing = {row[1] for row in c.fetchall()}
+    if 'tracking_code' not in existing:
+        c.execute("ALTER TABLE orders ADD COLUMN tracking_code TEXT")
+    if 'status' not in existing:
+        c.execute("ALTER TABLE orders ADD COLUMN status TEXT")
+    conn.commit()
+    if 'status' not in existing:
+        c.execute("UPDATE orders SET status = 'Pending' WHERE status IS NULL OR status = ''")
+    if 'tracking_code' not in existing:
+        c.execute("SELECT id FROM orders WHERE tracking_code IS NULL OR tracking_code = ''")
+        for (order_id,) in c.fetchall():
+            c.execute("UPDATE orders SET tracking_code = ? WHERE id = ?", (f"PE{order_id:06d}", order_id))
+    conn.commit()
+    conn.close()
+
+
+def generate_tracking_code():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    while True:
+        code = f"PE-{uuid.uuid4().hex[:8].upper()}"
+        c.execute("SELECT 1 FROM orders WHERE tracking_code = ?", (code,))
+        if not c.fetchone():
+            conn.close()
+            return code
+
+
 init_db()
+ensure_columns()
+
 
 def count_pdf_pages(filepath):
     try:
         reader = PdfReader(filepath)
         return len(reader.pages)
     except Exception:
-        return 1  # fallback if unreadable
+        return 1
+
 
 def calculate_price(print_type, side, lamination, copies, pages, delivery):
     if print_type == 'bw':
@@ -58,14 +104,17 @@ def calculate_price(print_type, side, lamination, copies, pages, delivery):
         total += 10
     return total
 
+
 @app.route('/')
 def index():
-    return render_template('frontend.html')
+    return render_template('frontend.html', error=None)
+
 
 @app.route('/upload', methods=['POST'])
 def upload():
     files = request.files.getlist('file')
     copies_list = request.form.getlist('copies')
+    pages_list = request.form.getlist('pages')
     print_type = request.form['print_type']
     side = request.form['side']
     lamination = request.form['lamination']
@@ -76,86 +125,158 @@ def upload():
     email = request.form.get('email', '').strip()
     room_no = request.form.get('room_no', '') if delivery == 'yes' else ''
 
-    # Backend validation
+    if not name:
+        return render_template('frontend.html', error="Name is required.")
     if not re.match(r'^\d{10}$', phone):
-        return "<h3>Error: Invalid phone number. Please enter a 10 digit number.</h3>"
+        return render_template('frontend.html', error="Invalid phone number. Please enter a 10 digit number.")
     if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
-        return "<h3>Error: Invalid email address.</h3>"
+        return render_template('frontend.html', error="Invalid email address.")
+    if delivery == 'yes' and not room_no:
+        return render_template('frontend.html', error="Room number is required for delivery.")
+    if not files or len(files) == 0 or files[0].filename == '':
+        return render_template('frontend.html', error="Please select at least one file.")
 
     total_billing = 0
     details = []
+    tracking_code = generate_tracking_code()
 
     for idx, file in enumerate(files):
-        # Prevent duplicate filenames
         rand_suffix = random.randint(1000, 9999)
-        filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{rand_suffix}_{file.filename}"
+        clean_name = secure_filename(file.filename)
+        filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{rand_suffix}_{clean_name}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         try:
             file.save(filepath)
         except Exception as e:
-            return f"<h3>Error uploading file: {file.filename}</h3><p>{str(e)}</p>"
+            return render_template('frontend.html', error=f"Error uploading file: {file.filename}. {str(e)}")
 
-        # Count pages for PDF, else assume 1 page
         if filename.lower().endswith('.pdf'):
             pages = count_pdf_pages(filepath)
         else:
-            pages = 1
+            try:
+                pages = int(pages_list[idx]) if idx < len(pages_list) else 1
+            except ValueError:
+                pages = 1
 
-        copies = int(copies_list[idx]) if idx < len(copies_list) else 1
+        try:
+            copies = int(copies_list[idx]) if idx < len(copies_list) else 1
+        except ValueError:
+            copies = 1
+
         total = calculate_price(print_type, side, lamination, copies, pages, delivery)
         total_billing += total
 
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        c.execute('''INSERT INTO orders (filename, print_type, side, lamination, copies, pages, total, hostel, delivery, name, phone, email, room_no, created_at)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                  (filename, print_type, side, lamination, copies, pages, total, hostel, delivery, name, phone, email, room_no, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        c.execute('''INSERT INTO orders (filename, print_type, side, lamination, copies, pages, total, hostel, delivery, name, phone, email, room_no, created_at, tracking_code, status)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                  (filename, print_type, side, lamination, copies, pages, total, hostel, delivery, name, phone, email, room_no, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), tracking_code, 'Pending'))
         conn.commit()
         conn.close()
 
-        details.append(f"File: {filename} | Pages: {pages} | Copies: {copies} | Price: ₹{total}")
+        details.append({
+            'filename': filename,
+            'pages': pages,
+            'copies': copies,
+            'total': total
+        })
 
-    if hostel == 'yes' and delivery == 'yes':
-        details.append(f"<b>Room Delivery Charge: ₹10</b><br>Room No: {room_no}")
+    return render_template(
+        'order_success.html',
+        name=name,
+        phone=phone,
+        email=email,
+        details=details,
+        total_billing=total_billing,
+        hostel=hostel,
+        delivery=delivery,
+        room_no=room_no,
+        tracking_code=tracking_code
+    )
 
-    detail_html = "<br>".join(details)
-    return f"<h3>Order Received!</h3><p>Name: {name}<br>Phone: {phone}<br>Email: {email}<br>{detail_html}<br><b>Total Billing: ₹{total_billing}</b></p><a href='/admin'>Go to Admin Panel</a>"
 
 @app.route('/admin')
 def admin():
+    q = request.args.get('q', '').strip()
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute('SELECT * FROM orders ORDER BY id DESC')
+    if q:
+        like = f"%{q}%"
+        c.execute('''SELECT * FROM orders
+                     WHERE tracking_code LIKE ? OR phone LIKE ? OR name LIKE ? OR email LIKE ?
+                     ORDER BY id DESC''', (like, like, like, like))
+    else:
+        c.execute('SELECT * FROM orders ORDER BY id DESC')
     orders = c.fetchall()
     conn.close()
 
-    html = "<h2>Admin Dashboard</h2><table border='1' cellpadding='5'><tr><th>ID</th><th>File</th><th>Type</th><th>Side</th><th>Lamination</th><th>Copies</th><th>Pages</th><th>Total</th><th>Hostel</th><th>Delivery</th><th>Name</th><th>Phone</th><th>Email</th><th>Room No</th><th>Date</th><th>Download</th></tr>"
-    for o in orders:
-        file_link = f"<a href='/download/{o[1]}' target='_blank'>Download</a>"
-        html += f"<tr><td>{o[0]}</td><td>{o[1]}</td><td>{o[2]}</td><td>{o[3]}</td><td>{o[4]}</td><td>{o[5]}</td><td>{o[6]}</td><td>₹{o[7]}</td><td>{o[8]}</td><td>{o[9]}</td><td>{o[10]}</td><td>{o[11]}</td><td>{o[12]}</td><td>{o[13]}</td><td>{o[14]}</td><td>{file_link}</td></tr>"
-    html += "</table>"
-    return html
+    return render_template('admin.html', orders=orders, q=q)
+
+
+@app.route('/admin/update-status', methods=['POST'])
+def update_status():
+    order_id = request.form.get('order_id')
+    status = request.form.get('status', 'Pending')
+    if not order_id:
+        return redirect(url_for('admin'))
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute('UPDATE orders SET status = ? WHERE id = ?', (status, order_id))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin'))
+
+
+@app.route('/track', methods=['GET', 'POST'])
+def track():
+    order = None
+    orders = []
+    search = ''
+    if request.method == 'POST':
+        search = request.form.get('search', '').strip()
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        if search:
+            if re.match(r'^PE-', search) or re.match(r'^PE\d+', search):
+                c.execute('SELECT * FROM orders WHERE tracking_code = ? ORDER BY id DESC', (search,))
+                order = c.fetchone()
+            else:
+                like = f"%{search}%"
+                c.execute('''SELECT * FROM orders
+                             WHERE phone LIKE ? OR email LIKE ? OR name LIKE ?
+                             ORDER BY id DESC''', (like, like, like))
+                orders = c.fetchall()
+        conn.close()
+    return render_template('track.html', order=order, orders=orders, search=search)
+
+
+@app.route('/contact')
+def contact():
+    return render_template('contact.html')
+
 
 @app.route('/download/<filename>')
 def download(filename):
-    return redirect(url_for('static', filename=f'../uploads/{filename}'))
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+
 
 @app.route('/export')
 def export_orders():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute('SELECT * FROM orders')
+    c.execute('SELECT * FROM orders ORDER BY id DESC')
     rows = c.fetchall()
     conn.close()
 
     def generate():
-        header = ['ID', 'Filename', 'Print Type', 'Side', 'Lamination', 'Copies', 'Pages', 'Total', 'Hostel', 'Delivery', 'Name', 'Phone', 'Email', 'Room No', 'Created At']
+        header = ['ID', 'Filename', 'Print Type', 'Side', 'Lamination', 'Copies', 'Pages', 'Total', 'Hostel', 'Delivery', 'Name', 'Phone', 'Email', 'Room No', 'Created At', 'Tracking Code', 'Status']
         yield ','.join(header) + '\n'
         for row in rows:
             yield ','.join([str(x) for x in row]) + '\n'
 
     return Response(generate(), mimetype='text/csv',
                     headers={"Content-Disposition": "attachment;filename=orders.csv"})
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

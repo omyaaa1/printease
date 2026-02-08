@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <div class="panel-head">
+    <h1>Admin Dashboard</h1>
+    <form method="get" action="/admin" class="search-bar">
+      <input type="text" name="q" placeholder="Search by tracking, phone, name, email" value="{{ q }}" />
+      <button type="submit" class="btn secondary">Search</button>
+      <a class="btn" href="/export">Export CSV</a>
+    </form>
+  </div>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Tracking</th>
+        <th>File</th>
+        <th>Type</th>
+        <th>Side</th>
+        <th>Lam</th>
+        <th>Copies</th>
+        <th>Pages</th>
+        <th>Total</th>
+        <th>Customer</th>
+        <th>Delivery</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Download</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td>{{ o[0] }}</td>
+        <td>{{ o[15] }}</td>
+        <td>{{ o[1] }}</td>
+        <td>{{ o[2] }}</td>
+        <td>{{ o[3] }}</td>
+        <td>{{ o[4] }}</td>
+        <td>{{ o[5] }}</td>
+        <td>{{ o[6] }}</td>
+        <td>INR {{ o[7] }}</td>
+        <td>
+          <div>{{ o[10] }}</div>
+          <div class="muted">{{ o[11] }}</div>
+          <div class="muted">{{ o[12] }}</div>
+        </td>
+        <td>
+          <div>{{ 'Hostel' if o[8] == 'yes' else 'Non-hostel' }}</div>
+          <div class="muted">{{ 'Room Delivery' if o[9] == 'yes' else 'Pickup' }}</div>
+          {% if o[9] == 'yes' %}
+          <div class="muted">Room {{ o[13] }}</div>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="/admin/update-status" class="status-form">
+            <input type="hidden" name="order_id" value="{{ o[0] }}" />
+            <select name="status" onchange="this.form.submit()">
+              {% set current = o[16] if o[16] else 'Pending' %}
+              <option value="Pending" {% if current == 'Pending' %}selected{% endif %}>Pending</option>
+              <option value="Printing" {% if current == 'Printing' %}selected{% endif %}>Printing</option>
+              <option value="Ready" {% if current == 'Ready' %}selected{% endif %}>Ready</option>
+              <option value="Delivered" {% if current == 'Delivered' %}selected{% endif %}>Delivered</option>
+              <option value="Cancelled" {% if current == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+            </select>
+          </form>
+        </td>
+        <td>{{ o[14] }}</td>
+        <td><a href="/download/{{ o[1] }}">Download</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

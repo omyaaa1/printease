@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <div class="panel-head">
+    <h1>Track Your Order</h1>
+    <p class="muted">Enter tracking code or phone/email to see status.</p>
+  </div>
+
+  <form method="post" action="/track" class="search-bar">
+    <input type="text" name="search" placeholder="Tracking code or phone/email" value="{{ search }}" />
+    <button type="submit" class="btn">Search</button>
+  </form>
+
+  {% if order %}
+  <div class="divider"></div>
+  <h2>Order</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Tracking</th>
+        <th>Status</th>
+        <th>File</th>
+        <th>Copies</th>
+        <th>Pages</th>
+        <th>Total</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{ order[15] }}</td>
+        <td>{{ order[16] }}</td>
+        <td>{{ order[1] }}</td>
+        <td>{{ order[5] }}</td>
+        <td>{{ order[6] }}</td>
+        <td>INR {{ order[7] }}</td>
+        <td>{{ order[14] }}</td>
+      </tr>
+    </tbody>
+  </table>
+  {% elif orders %}
+  <div class="divider"></div>
+  <h2>Orders</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Tracking</th>
+        <th>Status</th>
+        <th>File</th>
+        <th>Total</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td>{{ o[15] }}</td>
+        <td>{{ o[16] }}</td>
+        <td>{{ o[1] }}</td>
+        <td>INR {{ o[7] }}</td>
+        <td>{{ o[14] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif search %}
+  <div class="alert">No orders found for that search.</div>
+  {% endif %}
+</section>
+{% endblock %}

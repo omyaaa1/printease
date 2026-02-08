@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+  <h1>Order Received</h1>
+  <p class="muted">Keep this tracking code for updates.</p>
+
+  <div class="tracking-box">
+    <div class="muted">Tracking Code</div>
+    <div class="tracking-code">{{ tracking_code }}</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="grid-2">
+    <div>
+      <div class="label">Name</div>
+      <div>{{ name }}</div>
+    </div>
+    <div>
+      <div class="label">Phone</div>
+      <div>{{ phone }}</div>
+    </div>
+    <div>
+      <div class="label">Email</div>
+      <div>{{ email }}</div>
+    </div>
+    <div>
+      <div class="label">Delivery</div>
+      <div>{{ 'Room Delivery' if delivery == 'yes' else 'Pickup' }}</div>
+    </div>
+    {% if delivery == 'yes' %}
+    <div>
+      <div class="label">Room No</div>
+      <div>{{ room_no }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="divider"></div>
+
+  <h2>Files</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Pages</th>
+        <th>Copies</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in details %}
+      <tr>
+        <td>{{ item.filename }}</td>
+        <td>{{ item.pages }}</td>
+        <td>{{ item.copies }}</td>
+        <td>INR {{ item.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="price-row">
+    <div class="price-box">
+      <div class="muted">Final Total</div>
+      <div class="price">INR {{ total_billing }}</div>
+    </div>
+    <a class="btn secondary" href="/track">Track Order</a>
+    <a class="btn" href="/">New Order</a>
+  </div>
+</section>
+{% endblock %}

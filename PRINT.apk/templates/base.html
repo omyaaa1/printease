@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title if title else 'Printease' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <div class="brand-name">PRINTEASE</div>
+      <div class="brand-tag">Fast prints. Clean workflow.</div>
+    </div>
+    <nav class="site-nav">
+      <a href="/">Order</a>
+      <a href="/track">Track</a>
+      <a href="/contact">Contact</a>
+      <a href="/admin">Admin</a>
+    </nav>
+  </header>
+
+  <main class="site-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div>Printease</div>
+    <div class="muted">Minimal. Reliable. Dark.</div>
+  </footer>
+</body>
+</html>
