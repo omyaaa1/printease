@@ -1,1 +1,6 @@
 .vercel
+.venv
+__pycache__/
+*.pyc
+PRINT.apk/uploads/
+*.db
